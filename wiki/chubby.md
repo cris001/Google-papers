@@ -23,8 +23,8 @@
 
 ## 技术架构
 	Chubby的整个系统结构主要由服务端和客户端两部分组成，客户端通过RPC调用和服务端进行通信，如下图所示。
-	[![image](https://github.com/cris001/Google-papers/blob/master/wiki/media/chubby.png)]
-	一个典型的Chubby集群（Chubby Cell），通常由5台服务器组成，这些副本服务器采用Paxos协议，通过投票的方式来选举产生一个获得过半投票的服务器作为Master，一旦成为Master，Chubby就会保证在一段时间内不会再有其他服务器成为Master，这段时期称为Master租期（Master Lease），在运行过程中，Master服务器会通过不断续租的方式来延长Master租期，而如果Master服务器出现故障，那么余下的服务器会进行新一轮的Master选举，最终产生新的Master服务器，开始新的Master租期。
+	![image](https://github.com/cris001/Google-papers/blob/master/wiki/media/chubby.png)
+* 	一个典型的Chubby集群（Chubby Cell），通常由5台服务器组成，这些副本服务器采用Paxos协议，通过投票的方式来选举产生一个获得过半投票的服务器作为Master，一旦成为Master，Chubby就会保证在一段时间内不会再有其他服务器成为Master，这段时期称为Master租期（Master Lease），在运行过程中，Master服务器会通过不断续租的方式来延长Master租期，而如果Master服务器出现故障，那么余下的服务器会进行新一轮的Master选举，最终产生新的Master服务器，开始新的Master租期。
 
 　　集群中的每个服务器都维护着一份服务端数据库的副本，但在实际运行过程中，只有Master服务器才能对数据库进行写操作，而其他服务器都是使用Paxos协议从Master服务器上同步数据库数据的更新。
 
@@ -70,8 +70,8 @@
 ## Master故障恢复
 
 　　Master服务端会运行着会话租期计时器，用来管理所有的会话的生命周期，如果Master在运行过程中出现故障，那么该计时器就会停止，直到新的Master选举产生后，计时器才会继续计时，即从旧的Master崩溃到新的Master选举产生所花费的时间将不计入会话超时的计算中，这就等价于延长了客户端的会话租期，如果Master在短时间内就选举产生了，那么客户端就可以在本地会话租期过期前与其创建连接，而如果Master的选举花费了较长的时间，就会导致客户端只能清空本地的缓存而进入宽限期进行等待，由于宽限期的存在，使得会话能够很好地在服务端Master转化的过程中得到维持，整个Master的故障恢复过程中服务端和客户端的交互情况如下
-	[![image](https://github.com/cris001/Google-papers/blob/master/wiki/media/recover.png)]
-	如上图所示，一开始在旧的Master服务器上维持了一个会话租期lease M1，在客户端上维持对应的lease C1，同时客户端的KeepAlive请求1一直被Master服务器阻塞着。一段时间后，Master向客户端反馈了KeepAlive响应2，同时开始了新的会话租期lease M2，而客户端在接收到该KeepAlive响应后，立即发送了新的KeepAlive请求3，并同时也开始了新的会话租期lease C2。至此，客户端和服务端的交互都是正常的，随后，Master发生了故障，从而无法反馈客户端的KeepAlive请求3，在此过程中，客户端检测到会话租期lease C2已经过期，它会清空本地缓存并进入宽限期，这段时间内，客户端无法确定Master上的会话周期是否也已经过期，因此它不会销毁它的本地会话，而是将所有应用程序对它的API调用都阻塞住，以避免出现数据不一致的现象。同时，在客户端宽限期开始时，客户端会向上层应用程序发送一个“jeopardy”事件，一段时间后，服务器开始选举产生新的Master，并为该客户端初始化了新的会话租期lease M3，当客户端向新的Master发送KeepAlive请求4时，Master检测到该客户端的Master周期号已经过期，因此会在KeepAlive响应5中拒绝这个客户端请求，并将最新的Master周期号发送给客户端，之后，客户端会携带上最新的Master周期号，再次发送KeepAlive请求6给Master，最终，整个客户端和服务端之间的会话就会再次回复正常。
+	![image](https://github.com/cris001/Google-papers/blob/master/wiki/media/recover.png)	
+* 	如上图所示，一开始在旧的Master服务器上维持了一个会话租期lease M1，在客户端上维持对应的lease C1，同时客户端的KeepAlive请求1一直被Master服务器阻塞着。一段时间后，Master向客户端反馈了KeepAlive响应2，同时开始了新的会话租期lease M2，而客户端在接收到该KeepAlive响应后，立即发送了新的KeepAlive请求3，并同时也开始了新的会话租期lease C2。至此，客户端和服务端的交互都是正常的，随后，Master发生了故障，从而无法反馈客户端的KeepAlive请求3，在此过程中，客户端检测到会话租期lease C2已经过期，它会清空本地缓存并进入宽限期，这段时间内，客户端无法确定Master上的会话周期是否也已经过期，因此它不会销毁它的本地会话，而是将所有应用程序对它的API调用都阻塞住，以避免出现数据不一致的现象。同时，在客户端宽限期开始时，客户端会向上层应用程序发送一个“jeopardy”事件，一段时间后，服务器开始选举产生新的Master，并为该客户端初始化了新的会话租期lease M3，当客户端向新的Master发送KeepAlive请求4时，Master检测到该客户端的Master周期号已经过期，因此会在KeepAlive响应5中拒绝这个客户端请求，并将最新的Master周期号发送给客户端，之后，客户端会携带上最新的Master周期号，再次发送KeepAlive请求6给Master，最终，整个客户端和服务端之间的会话就会再次回复正常。
 
 　　在Master转化的这段时间内，只要客户端的宽限足够长，那么客户端应用程序就可以在没有任何察觉的情况下，实现Chubby的故障恢复，但如果客户端的宽限期设置得比较短，那么Chubby客户端就会丢弃当前会话，并将这个异常情况通知给上层应用程序。
 
