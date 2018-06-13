@@ -23,8 +23,7 @@
 
 ## 技术架构
 	Chubby的整个系统结构主要由服务端和客户端两部分组成，客户端通过RPC调用和服务端进行通信，如下图所示。
-	
-	![image](https://github.com/cris001/Google-papers/blob/master/wiki/media/chubby.png)
+	![image](https://github.com/cris001/Google-papers/blob/master/wiki/media/recover.png)
 * 	一个典型的Chubby集群（Chubby Cell），通常由5台服务器组成，这些副本服务器采用Paxos协议，通过投票的方式来选举产生一个获得过半投票的服务器作为Master，一旦成为Master，Chubby就会保证在一段时间内不会再有其他服务器成为Master，这段时期称为Master租期（Master Lease），在运行过程中，Master服务器会通过不断续租的方式来延长Master租期，而如果Master服务器出现故障，那么余下的服务器会进行新一轮的Master选举，最终产生新的Master服务器，开始新的Master租期。
 
 　　集群中的每个服务器都维护着一份服务端数据库的副本，但在实际运行过程中，只有Master服务器才能对数据库进行写操作，而其他服务器都是使用Paxos协议从Master服务器上同步数据库数据的更新。
